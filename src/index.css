@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#FDFCFB] text-zinc-900;
+  }
+}
+
+/* Custom Prose Styles for Academic Look */
+.prose h1, .prose h2, .prose h3 {
+  @apply tracking-tight text-zinc-900;
+}
+
+.prose h2 {
+  @apply border-b border-zinc-200 pb-2 mb-6 mt-12;
+}
+
+.prose p {
+  @apply mb-6;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-emerald-500 bg-emerald-50/30 py-2 px-6 rounded-r-lg italic text-emerald-900;
+}
+
+.prose ul, .prose ol {
+  @apply mb-6;
+}
+
+.prose li {
+  @apply mb-2;
+}
