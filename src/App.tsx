@@ -5,11 +5,46 @@
 
 import { useState } from 'react';
 import { FileUpload } from './components/FileUpload';
-import { analyzePaper, ExtractedImage } from './services/geminiService';
+import {
+  analyzePaper,
+  ExtractedImage,
+  AVAILABLE_MODELS,
+  GeminiModel,
+} from './services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, Archive, Copy, Check, Sparkles, ChevronRight, FileText } from 'lucide-react';
+import { BookOpen, Archive, Copy, Check, Sparkles, ChevronRight, FileText, Settings2 } from 'lucide-react';
 import JSZip from 'jszip';
+
+const SETTINGS_STORAGE_KEY = 'paperinsight.settings';
+const DEFAULT_MODEL: GeminiModel = 'gemini-3.1-pro-preview';
+
+interface UserSettings {
+  apiKey: string;
+  model: GeminiModel;
+}
+
+function loadInitialSettings(): UserSettings {
+  const fallback: UserSettings = {
+    apiKey: '',
+    model: DEFAULT_MODEL,
+  };
+
+  try {
+    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved) as Partial<UserSettings>;
+    const isValidModel =
+      typeof parsed.model === 'string' &&
+      AVAILABLE_MODELS.includes(parsed.model as GeminiModel);
+    return {
+      apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : fallback.apiKey,
+      model: isValidModel ? (parsed.model as GeminiModel) : fallback.model,
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 export default function App() {
   const [report, setReport] = useState<string | null>(null);
@@ -17,12 +52,30 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [fileName, setFileName] = useState<string>('');
+  const [settings, setSettings] = useState<UserSettings>(loadInitialSettings);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const saveSettings = () => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 1500);
+  };
 
   const handleFileSelect = async (content: string, name: string) => {
+    if (!settings.apiKey.trim()) {
+      alert('請先在設定區輸入 Gemini API Key。');
+      return;
+    }
+
     setIsProcessing(true);
     setFileName(name);
     try {
-      const { report: result, images } = await analyzePaper(content);
+      const { report: result, images } = await analyzePaper(
+        content,
+        settings.apiKey.trim(),
+        settings.model
+      );
       setReport(result);
       setExtractedImages(images);
     } catch (error) {
@@ -92,18 +145,96 @@ export default function App() {
     <div className="min-h-screen bg-[#FDFCFB] text-zinc-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       {/* Header */}
       <header className="border-b border-zinc-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between relative">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-xl tracking-tight">PaperInsight AI</span>
           </div>
-          <div className="flex items-center gap-4 text-sm font-medium text-zinc-500">
+          <div className="flex items-center gap-3 text-sm font-medium text-zinc-500">
             <span className="hidden sm:inline">基於「三遍掃描法」</span>
             <ChevronRight className="w-4 h-4 hidden sm:inline" />
-            <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Gemini 3.1 Pro 驅動</span>
+            <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded">{settings.model} 驅動</span>
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen((previous) => !previous)}
+              className="p-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 transition-colors"
+              aria-label="開啟設定"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
           </div>
+
+          {isSettingsOpen && (
+            <div className="absolute right-6 top-14 w-[360px] max-w-[calc(100vw-3rem)] bg-white border border-zinc-200 rounded-2xl p-5 shadow-xl">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <h2 className="text-base font-bold text-zinc-800">設定</h2>
+                {settingsSaved && (
+                  <span className="text-sm text-emerald-600 font-medium">已儲存</span>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 mb-4">
+                <label className="text-sm font-medium text-zinc-700" htmlFor="gemini-api-key">
+                  Gemini API Key
+                </label>
+                <input
+                  id="gemini-api-key"
+                  type="password"
+                  value={settings.apiKey}
+                  onChange={(event) =>
+                    setSettings((previous) => ({
+                      ...previous,
+                      apiKey: event.target.value,
+                    }))
+                  }
+                  placeholder="請輸入你的 Gemini API Key"
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 mb-5">
+                <label className="text-sm font-medium text-zinc-700" htmlFor="gemini-model">
+                  Gemini 模型
+                </label>
+                <select
+                  id="gemini-model"
+                  value={settings.model}
+                  onChange={(event) =>
+                    setSettings((previous) => ({
+                      ...previous,
+                      model: event.target.value as GeminiModel,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  {AVAILABLE_MODELS.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-zinc-300 text-zinc-700 text-sm font-medium hover:bg-zinc-50 transition-colors"
+                >
+                  關閉
+                </button>
+                <button
+                  type="button"
+                  onClick={saveSettings}
+                  className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-colors"
+                >
+                  儲存設定
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -128,7 +259,6 @@ export default function App() {
           </motion.p>
         </section>
 
-        {/* Upload Section */}
         <section className="mb-12">
           <FileUpload onFileSelect={handleFileSelect} isProcessing={isProcessing} />
         </section>

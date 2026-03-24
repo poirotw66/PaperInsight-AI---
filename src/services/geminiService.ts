@@ -1,6 +1,12 @@
 import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
 
-const MODEL_NAME = "gemini-3.1-pro-preview";
+export const AVAILABLE_MODELS = [
+  "gemini-3.1-flash-lite-preview",
+  "gemini-3.1-pro-preview",
+  "gemini-3-flash-preview",
+] as const;
+
+export type GeminiModel = (typeof AVAILABLE_MODELS)[number];
 
 export interface ExtractedImage {
   filename: string;
@@ -9,8 +15,12 @@ export interface ExtractedImage {
   originalAlt: string;
 }
 
-export async function analyzePaper(content: string): Promise<{ report: string; images: ExtractedImage[] }> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+export async function analyzePaper(
+  content: string,
+  apiKey: string,
+  model: GeminiModel
+): Promise<{ report: string; images: ExtractedImage[] }> {
+  const ai = new GoogleGenAI({ apiKey });
 
   // Regex to find base64 images in Markdown: ![alt](data:image/png;base64,...)
   const imageRegex = /!\[(.*?)\]\((data:image\/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=]+))\)/g;
@@ -125,7 +135,7 @@ export async function analyzePaper(content: string): Promise<{ report: string; i
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: MODEL_NAME,
+      model,
       contents: [{ parts: [...parts, { text: prompt }] }],
       config: {
         systemInstruction,
