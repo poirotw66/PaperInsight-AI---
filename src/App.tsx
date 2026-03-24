@@ -165,7 +165,16 @@ export default function App() {
               </div>
 
               <div className="p-8 sm:p-12 prose prose-zinc max-w-none prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h2:border-b prose-h2:pb-2 prose-h2:mt-12 prose-h3:text-xl prose-p:text-zinc-600 prose-p:leading-relaxed prose-li:text-zinc-600 prose-strong:text-zinc-900 prose-code:text-emerald-600 prose-code:bg-emerald-50 prose-code:px-1 prose-code:rounded prose-img:rounded-2xl prose-img:shadow-lg prose-img:mx-auto">
-                <ReactMarkdown>{renderMarkdown(report)}</ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    img: ({ src, ...props }) => {
+                      if (!src) return null;
+                      return <img src={src} {...props} referrerPolicy="no-referrer" />;
+                    }
+                  }}
+                >
+                  {renderMarkdown(report)}
+                </ReactMarkdown>
               </div>
             </motion.section>
           )}
